@@ -21,9 +21,40 @@ require_once("../modelos/Usuarios.php");
 //   VALIDAR CABECERA 'cedula'
 // -----------------------------------------------------
 $encabezados = getallheaders();
-if (!isset($encabezados['cedula'])) {
-    echo json_encode(["error" => "Acceso no autorizado: cabecera 'cedula' requerida"]);
+
+// Normalizar header 'cedula' o 'X-Cedula'
+$cedula_header = null;
+
+if (isset($encabezados['cedula'])) {
+    $cedula_header = $encabezados['cedula'];
+} elseif (isset($encabezados['Cedula'])) {
+    $cedula_header = $encabezados['Cedula'];
+} elseif (isset($encabezados['X-Cedula'])) {
+    $cedula_header = $encabezados['X-Cedula'];
+} elseif (isset($_SERVER['HTTP_X_CEDULA'])) {
+    $cedula_header = $_SERVER['HTTP_X_CEDULA'];
+}
+
+// Validar header
+if (!$cedula_header) {
+    echo json_encode([
+        "error" => "Acceso no autorizado: cabecera 'cedula' o 'X-Cedula' no recibida en servidor",
+        "debug_headers" => $encabezados,
+        "debug_server" => $_SERVER
+    ]);
     exit();
+}
+
+$cedula = $cedula_header;
+
+// Validar header
+if (!$cedula_header) {
+    echo json_encode(["error" => "Acceso no autorizado: cabecera 'cedula' no recibida en servidor"]);
+    exit();
+}
+
+$cedula = $cedula_header;
+
 }
 
 $cedula = $encabezados['cedula'];
@@ -145,3 +176,4 @@ switch ($op) {
         break;
 }
 ?>
+
