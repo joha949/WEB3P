@@ -4,6 +4,11 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, cedula, Authorization, X-Requested-With");
 
+// Respuesta rápida a solicitudes OPTIONS (preflight)
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 // -----------------------------------------------------
 //   IMPORTAR DEPENDENCIAS
@@ -21,12 +26,9 @@ if (!isset($encabezados['cedula'])) {
     exit();
 }
 
-// -----------------------------------------------------
-//   OBTENER DATOS DEL USUARIO Y LLAVE SECRETA
-// -----------------------------------------------------
-$usuario = new Usuarios();
 $cedula = $encabezados['cedula'];
 
+$usuario = new Usuarios();
 $usuario_db = $usuario->obtener_por_cedula($cedula);
 
 if (!$usuario_db || !isset($usuario_db['llave'])) {
@@ -37,40 +39,48 @@ if (!$usuario_db || !isset($usuario_db['llave'])) {
 $clave_secreta_usuario = $usuario_db['llave'];
 
 // -----------------------------------------------------
-//   FUNCION PARA DESENCRIPTAR EL BODY
+//   FUNCION PARA DESENCRIPTAR EL BODY (AES-256-ECB)
 // -----------------------------------------------------
 function Desencriptar_BODY($JSON, $clave)
 {
-    $cifrado = "aes-256-ecb";
-
-    if (empty($JSON) || empty($clave)) return false;
+    if (empty($JSON)) return null;
 
     $decoded = base64_decode($JSON, true);
-    if ($decoded === false) return false;
+    if ($decoded === false) return null;
 
-    return openssl_decrypt($decoded, $cifrado, $clave, OPENSSL_RAW_DATA);
+    return openssl_decrypt(
+        $decoded,
+        "aes-256-ecb",
+        $clave,
+        OPENSSL_RAW_DATA
+    );
 }
 
 // -----------------------------------------------------
-//   PROCESAR EL BODY ENCRIPTADO SI EXISTE
+//   PROCESAR BODY
 // -----------------------------------------------------
 $body_encriptado = file_get_contents("php://input");
 
 if (!empty($body_encriptado)) {
     $desencriptado = Desencriptar_BODY($body_encriptado, $clave_secreta_usuario);
-    $body = json_decode($desencriptado, true);
 
-    if ($body === null) {
-        echo json_encode(["Error" => "Error al desencriptar los datos del body"]);
+    if ($desencriptado === false || $desencriptado === null) {
+        echo json_encode(["error" => "Error al desencriptar el body"]);
         exit();
     }
 
+    $body = json_decode($desencriptado, true);
+
+    if (!is_array($body)) {
+        echo json_encode(["error" => "JSON inválido tras desencriptación"]);
+        exit();
+    }
 } else {
-    $body = []; // Body vacío para operaciones GET
+    $body = [];
 }
 
 // -----------------------------------------------------
-//   VALIDAR 'op' EN LA URL
+//   VALIDAR 'op'
 // -----------------------------------------------------
 if (!isset($_GET["op"])) {
     echo json_encode([
@@ -81,20 +91,15 @@ if (!isset($_GET["op"])) {
 }
 
 $op = trim($_GET["op"]);
-
-// -----------------------------------------------------
-//   MODELO AUTOR
-// -----------------------------------------------------
 $autor = new Autor();
 
 // -----------------------------------------------------
-//   SWITCH DE OPERACIONES
+//   SWITCH PRINCIPAL
 // -----------------------------------------------------
 switch ($op) {
 
     case "ObtenerTodos":
-        $datos = $autor->obtener_autores();
-        echo json_encode($datos, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        echo json_encode($autor->obtener_autores(), JSON_UNESCAPED_UNICODE);
         break;
 
     case "ObtenerPorId":
@@ -102,13 +107,12 @@ switch ($op) {
             echo json_encode(["error" => "Falta parámetro 'id'"]);
             exit();
         }
-        $datos = $autor->obtener_autor_por_id($body["id"]);
-        echo json_encode($datos, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        echo json_encode($autor->obtener_autor_por_id($body["id"]), JSON_UNESCAPED_UNICODE);
         break;
 
     case "Insertar":
         if (!isset($body["nombre"]) || !isset($body["nacionalidad"])) {
-            echo json_encode(["error" => "Datos incompletos para insertar"]);
+            echo json_encode(["error" => "Datos incompletos"]);
             exit();
         }
         $autor->insertar_autor($body["nombre"], $body["nacionalidad"]);
@@ -117,7 +121,7 @@ switch ($op) {
 
     case "Actualizar":
         if (!isset($body["id"]) || !isset($body["nombre"]) || !isset($body["nacionalidad"])) {
-            echo json_encode(["error" => "Datos incompletos para actualizar"]);
+            echo json_encode(["error" => "Datos incompletos"]);
             exit();
         }
         $autor->actualizar_autor($body["id"], $body["nombre"], $body["nacionalidad"]);
@@ -141,6 +145,3 @@ switch ($op) {
         break;
 }
 ?>
-
-
-
