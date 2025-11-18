@@ -4,17 +4,17 @@ class Conectar {
 
     protected function conectar_bd() {
         try {
-            // Variables reales de Railway
-            $host = getenv('MYSQLHOST');
-            $db   = getenv('MYSQLDATABASE');
-            $user = getenv('MYSQLUSER');
-            $pass = getenv('MYSQLPASSWORD');
-            $port = getenv('MYSQLPORT');
+            // Variables correctas de Railway
+            $host = getenv('DB_HOST');
+            $db   = getenv('DB_NAME');
+            $user = getenv('DB_USER');
+            $pass = getenv('DB_PASSWORD');
+            $port = getenv('DB_PORT');
 
-            // Cadena DSN correcta
+            // DSN
             $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4";
 
-            // Conexión
+            // Conexión PDO
             $this->conexion_bd = new PDO($dsn, $user, $pass, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
             ]);
@@ -24,7 +24,7 @@ class Conectar {
         } catch (Exception $e) {
             echo json_encode([
                 "error" => "Error de conexión",
-                "detalles" => $e->getMessage(),
+                "details" => $e->getMessage(),
                 "host" => $host,
                 "db" => $db,
                 "user" => $user,
