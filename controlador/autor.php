@@ -2,9 +2,9 @@
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, cedula, Authorization, X-Requested-With");
+header("Access-Control-Allow-Headers: Content-Type, Cedula, cedula, X-Cedula, Authorization, X-Requested-With");
 
-// Respuesta rápida a solicitudes OPTIONS (preflight)
+// Respuesta a solicitudes OPTIONS (preflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
@@ -18,47 +18,34 @@ require_once("../modelos/Autor.php");
 require_once("../modelos/Usuarios.php");
 
 // -----------------------------------------------------
-//   VALIDAR CABECERA 'cedula'
+//   LEER Y NORMALIZAR HEADER 'cedula'
 // -----------------------------------------------------
 $encabezados = getallheaders();
 
-// Normalizar header 'cedula' o 'X-Cedula'
 $cedula_header = null;
 
-if (isset($encabezados['cedula'])) {
-    $cedula_header = $encabezados['cedula'];
-} elseif (isset($encabezados['Cedula'])) {
-    $cedula_header = $encabezados['Cedula'];
-} elseif (isset($encabezados['X-Cedula'])) {
-    $cedula_header = $encabezados['X-Cedula'];
-} elseif (isset($_SERVER['HTTP_X_CEDULA'])) {
-    $cedula_header = $_SERVER['HTTP_X_CEDULA'];
-}
+// Revisar todas las variantes posibles
+if     (isset($encabezados['cedula']))        $cedula_header = $encabezados['cedula'];
+elseif (isset($encabezados['Cedula']))        $cedula_header = $encabezados['Cedula'];
+elseif (isset($encabezados['X-Cedula']))      $cedula_header = $encabezados['X-Cedula'];
+elseif (isset($_SERVER['HTTP_X_CEDULA']))     $cedula_header = $_SERVER['HTTP_X_CEDULA'];
+elseif (isset($_SERVER['HTTP_CEDULA']))       $cedula_header = $_SERVER['HTTP_CEDULA'];
 
-// Validar header
+// Validación final
 if (!$cedula_header) {
     echo json_encode([
-        "error" => "Acceso no autorizado: cabecera 'cedula' o 'X-Cedula' no recibida en servidor",
+        "error" => "Acceso no autorizado: cabecera 'cedula' no recibida",
         "debug_headers" => $encabezados,
-        "debug_server" => $_SERVER
+        "debug_server" => array_filter($_SERVER, fn($k)=>str_contains($k,'CEDULA'), ARRAY_FILTER_USE_KEY)
     ]);
     exit();
 }
 
 $cedula = $cedula_header;
 
-// Validar header
-if (!$cedula_header) {
-    echo json_encode(["error" => "Acceso no autorizado: cabecera 'cedula' no recibida en servidor"]);
-    exit();
-}
-
-$cedula = $cedula_header;
-
-}
-
-$cedula = $encabezados['cedula'];
-
+// -----------------------------------------------------
+//   VALIDAR USUARIO Y LLAVE DE CIFRADO
+// -----------------------------------------------------
 $usuario = new Usuarios();
 $usuario_db = $usuario->obtener_por_cedula($cedula);
 
@@ -70,7 +57,7 @@ if (!$usuario_db || !isset($usuario_db['llave'])) {
 $clave_secreta_usuario = $usuario_db['llave'];
 
 // -----------------------------------------------------
-//   FUNCION PARA DESENCRIPTAR EL BODY (AES-256-ECB)
+//   FUNCION PARA DESENCRIPTAR BODY (AES-256-ECB)
 // -----------------------------------------------------
 function Desencriptar_BODY($JSON, $clave)
 {
@@ -93,6 +80,7 @@ function Desencriptar_BODY($JSON, $clave)
 $body_encriptado = file_get_contents("php://input");
 
 if (!empty($body_encriptado)) {
+
     $desencriptado = Desencriptar_BODY($body_encriptado, $clave_secreta_usuario);
 
     if ($desencriptado === false || $desencriptado === null) {
@@ -111,7 +99,7 @@ if (!empty($body_encriptado)) {
 }
 
 // -----------------------------------------------------
-//   VALIDAR 'op'
+//   VALIDAR PARÁMETRO 'op'
 // -----------------------------------------------------
 if (!isset($_GET["op"])) {
     echo json_encode([
@@ -125,7 +113,7 @@ $op = trim($_GET["op"]);
 $autor = new Autor();
 
 // -----------------------------------------------------
-//   SWITCH PRINCIPAL
+//   CONTROLADOR PRINCIPAL
 // -----------------------------------------------------
 switch ($op) {
 
@@ -176,4 +164,3 @@ switch ($op) {
         break;
 }
 ?>
-
