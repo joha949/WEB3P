@@ -4,26 +4,37 @@ class Conectar {
 
     protected function conectar_bd() {
         try {
-            // Variables reales que Railway sí da
+            // Variables reales de Railway
             $host = getenv('MYSQLHOST');
             $db   = getenv('MYSQLDATABASE');
             $user = getenv('MYSQLUSER');
             $pass = getenv('MYSQLPASSWORD');
             $port = getenv('MYSQLPORT');
 
-            $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8";
+            // Cadena DSN correcta
+            $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4";
 
-            $this->conexion_bd = new PDO($dsn, $user, $pass);
+            // Conexión
+            $this->conexion_bd = new PDO($dsn, $user, $pass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+            ]);
+
             return $this->conexion_bd;
 
         } catch (Exception $e) {
-            print "Error de conexión: " . $e->getMessage();
+            echo json_encode([
+                "error" => "Error de conexión",
+                "detalles" => $e->getMessage(),
+                "host" => $host,
+                "db" => $db,
+                "user" => $user,
+                "port" => $port
+            ]);
             die();
         }
     }
 
     public function establecer_codificacion() {
-        return $this->conexion_bd->query("SET NAMES 'utf8'");
+        return $this->conexion_bd->query("SET NAMES utf8mb4");
     }
 }
-?>
